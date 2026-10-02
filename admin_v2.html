@@ -41,12 +41,13 @@ button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:point
   <div class="grid">
     <div class="stat"><span class="label">Today</span><b id="todayCount">0</b></div>
     <div class="stat"><span class="label">Upcoming</span><b id="upcomingCount">0</b></div>
-    <div class="stat"><span class="label">Confirmed</span><b id="confirmedCount">0</b></div>
-    <div class="stat"><span class="label">Cancelled</span><b id="cancelledCount">0</b></div>
+    <div class="stat"><span class="label">Cancelled (upcoming)</span><b id="cancelledCount">0</b></div>
+    <div class="stat"><span class="label">Past (all time)</span><b id="pastCount">0</b></div>
   </div>
 
   <div class="panel" style="margin-top:18px">
     <div class="controls">
+      <div class="field small"><label>Show</label><select id="viewFilter"><option value="upcoming">Upcoming</option><option value="past">Past</option><option value="all">All</option></select></div>
       <div class="field small"><label>Date</label><input id="dateFilter" type="date"></div>
       <div class="field small"><label>Barber</label><select id="barberFilter"><option value="">All barbers</option></select></div>
       <div class="field"><label>Search customer</label><input id="searchFilter" placeholder="Name, email, or phone"></div>
@@ -102,28 +103,27 @@ function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;',
 async function loadAppointments(){
   clearMsg($('appMessage'));
   try{
-    const data=await invokeAdmin('list');
+    const data=await invokeAdmin('list',{view:$('viewFilter').value,today:localDateString(),date:$('dateFilter').value||null});
     allAppointments=data.appointments||[];
+    renderStats(data.stats);
     render();
+    if(data.truncated) msg($('appMessage'),'Showing the first '+allAppointments.length+' results. Use the Show menu or date filter to narrow the list.');
     $('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
   }catch(e){msg($('appMessage'),e.message)}
 }
 
+function renderStats(s){if(!s)return;$('todayCount').textContent=s.today;$('upcomingCount').textContent=s.upcoming;$('cancelledCount').textContent=s.cancelled_upcoming;$('pastCount').textContent=s.past}
 function render(){
   const today=localDateString();
-  const confirmed=allAppointments.filter(a=>a.status==='confirmed');
-  $('todayCount').textContent=confirmed.filter(a=>a.appointment_date===today).length;
-  $('upcomingCount').textContent=confirmed.filter(a=>a.appointment_date>=today).length;
-  $('confirmedCount').textContent=confirmed.length;
-  $('cancelledCount').textContent=allAppointments.filter(a=>a.status==='cancelled').length;
 
+  const asc=$('viewFilter').value==='upcoming'||!!$('dateFilter').value;
   const date=$('dateFilter').value, barber=$('barberFilter').value, q=$('searchFilter').value.trim().toLowerCase();
   const rows=allAppointments.filter(a=>{
     if(date && a.appointment_date!==date)return false;
     if(barber && a.barber_id!==barber)return false;
     if(q && ![a.customer_name,a.customer_email,a.customer_phone,a.barber_name,a.service_name].some(v=>String(v??'').toLowerCase().includes(q)))return false;
     return true;
-  }).sort((a,b)=>`${a.appointment_date} ${a.appointment_time}`.localeCompare(`${b.appointment_date} ${b.appointment_time}`));
+  }).sort((a,b)=>{const c=`${a.appointment_date} ${a.appointment_time}`.localeCompare(`${b.appointment_date} ${b.appointment_time}`);return asc?c:-c});
 
   $('appointmentsBody').innerHTML=rows.length?rows.map(a=>`
     <tr>
@@ -133,7 +133,7 @@ function render(){
       <td>${escapeHtml(a.service_name)}<br><span class="muted">${a.duration_minutes||''} min</span></td>
       <td>${escapeHtml(a.customer_phone)}</td>
       <td><span class="status ${a.status==='cancelled'?'cancelled':''}">${escapeHtml(a.status)}</span></td>
-      <td>${a.status==='confirmed'?`<button class="danger" onclick="cancelAppointment('${a.id}')">Cancel</button>`:'—'}</td>
+      <td>${a.status==='confirmed'&&a.appointment_date>=today?`<button class="danger" onclick="cancelAppointment('${a.id}')">Cancel</button>`:'—'}</td>
     </tr>`).join(''):'<tr><td colspan="7" class="muted">No appointments match the current filters.</td></tr>';
 }
 
@@ -153,8 +153,8 @@ $('loginForm').addEventListener('submit',async e=>{
 });
 $('logoutBtn').onclick=()=>_supabase.auth.signOut();
 $('refreshBtn').onclick=loadAppointments;
-$('dateFilter').oninput=render;$('barberFilter').onchange=render;$('searchFilter').oninput=render;
-$('clearBtn').onclick=()=>{$('dateFilter').value='';$('barberFilter').value='';$('searchFilter').value='';render()};
+$('dateFilter').oninput=loadAppointments;$('viewFilter').onchange=loadAppointments;$('barberFilter').onchange=render;$('searchFilter').oninput=render;
+$('clearBtn').onclick=()=>{$('dateFilter').value='';$('barberFilter').value='';$('searchFilter').value='';$('viewFilter').value='upcoming';loadAppointments()};
 
 _supabase.auth.onAuthStateChange(async (_event,session)=>{
   if(session){$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');try{await loadBarbers();await loadAppointments()}catch(e){msg($('appMessage'),e.message)}}
