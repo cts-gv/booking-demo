@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Appointment</title>
+<style>
+    :root{
+        --bg:#0b0d0f;
+        --panel:rgba(20,23,27,.88);
+        --panel-2:#15191e;
+        --gold:#d6a85a;
+        --gold-bright:#f0c978;
+        --cream:#f5efe5;
+        --muted:#a9adb3;
+        --line:rgba(255,255,255,.09);
+        --danger:#e47777;
+        --shadow:0 24px 70px rgba(0,0,0,.45);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+        margin:0;
+        min-height:100vh;
+        font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        color:var(--cream);
+        background:
+            radial-gradient(circle at 15% 10%,rgba(214,168,90,.16),transparent 30%),
+            radial-gradient(circle at 90% 80%,rgba(214,168,90,.08),transparent 28%),
+            linear-gradient(135deg,#090b0d 0%,#101317 52%,#080a0c 100%);
+        display:flex;
+        justify-content:center;
+        padding:48px 18px;
+        overflow-x:hidden;
+    }
+    body::before{
+        content:"";
+        position:fixed; inset:0; pointer-events:none; opacity:.045;
+        background-image:linear-gradient(rgba(255,255,255,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.5) 1px,transparent 1px);
+        background-size:42px 42px;
+        mask-image:linear-gradient(to bottom,black,transparent 85%);
+    }
+    .booking-shell{width:min(620px,100%);position:relative}
+    .booking-card{
+        position:relative; overflow:hidden;
+        background:linear-gradient(145deg,rgba(25,29,34,.96),rgba(12,14,17,.96));
+        border:1px solid var(--line);
+        border-radius:28px;
+        box-shadow:var(--shadow);
+        padding:34px;
+        animation:cardIn .7s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .booking-card::after{
+        content:""; position:absolute; width:240px;height:240px;border-radius:50%;
+        background:rgba(214,168,90,.09); filter:blur(4px); top:-120px;right:-90px;pointer-events:none;
+    }
+    .brand{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+    .brand-mark{
+        width:48px;height:48px;border:1px solid rgba(214,168,90,.45);border-radius:15px;
+        display:grid;place-items:center;color:var(--gold-bright);font-size:22px;
+        background:rgba(214,168,90,.08);box-shadow:inset 0 0 20px rgba(214,168,90,.05)
+    }
+    .eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:11px;color:var(--gold);font-weight:800}
+    h2{margin:5px 0 0;font-family:Georgia,serif;font-size:34px;line-height:1.1;font-weight:500}
+    .intro{color:var(--muted);font-size:14px;margin:9px 0 28px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .field{position:relative}
+    .field.full{grid-column:1/-1}
+    label{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d8dadd}
+    label::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--gold)}
+    select,input{
+        width:100%;padding:14px 15px;border-radius:13px;border:1px solid rgba(255,255,255,.1);
+        background:rgba(7,9,11,.72);color:var(--cream);outline:none;
+        font:inherit;transition:border-color .25s,box-shadow .25s,transform .25s,background .25s;
+    }
+    select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:38px}
+    input[type=date]{color-scheme:dark}
+    select:focus,input:focus{border-color:rgba(240,201,120,.75);box-shadow:0 0 0 4px rgba(214,168,90,.11);background:rgba(12,15,18,.95);transform:translateY(-1px)}
+    option{background:#14181c;color:var(--cream)}
+    option:disabled{color:#777;background:#202328}
+    .time-wrap{position:relative}
+    .availability{margin-top:8px;color:var(--muted);font-size:12px;min-height:18px}
+    .submit-btn{
+        position:relative;width:100%;margin-top:25px;padding:16px 20px;border:0;border-radius:14px;
+        background:linear-gradient(135deg,var(--gold-bright),var(--gold));color:#14110a;
+        font-weight:900;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
+        box-shadow:0 12px 30px rgba(214,168,90,.18);overflow:hidden;
+        transition:transform .25s,box-shadow .25s,filter .25s;
+    }
+    .submit-btn::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.42) 50%,transparent 75%);transform:translateX(-120%);transition:transform .6s}
+    .submit-btn:hover{transform:translateY(-2px);box-shadow:0 17px 38px rgba(214,168,90,.27);filter:saturate(1.08)}
+    .submit-btn:hover::before{transform:translateX(120%)}
+    .submit-btn:active{transform:translateY(0)}
+    .note{text-align:center;color:#777d84;font-size:11px;margin:18px 0 0}
+    .fade-field{animation:fieldIn .55s both}
+    .fade-field:nth-child(2){animation-delay:.05s}.fade-field:nth-child(3){animation-delay:.1s}.fade-field:nth-child(4){animation-delay:.15s}
+    .fade-field:nth-child(5){animation-delay:.2s}.fade-field:nth-child(6){animation-delay:.25s}
+    @keyframes cardIn{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+    @keyframes fieldIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .cancel-divider{
+        height:1px;background:var(--line);margin:32px 0 28px;
+    }
+    .cancel-section h3{
+        margin:6px 0 8px;font-family:Georgia,serif;font-size:27px;font-weight:500;
+    }
+    .cancel-intro{
+        color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 20px;
+    }
+    .cancel-grid{
+        display:grid;grid-template-columns:1fr 1fr;gap:16px;
+    }
+    .cancel-find-btn{
+        width:100%;margin-top:18px;padding:14px 18px;border:1px solid rgba(214,168,90,.45);
+        border-radius:13px;background:rgba(214,168,90,.08);color:var(--gold-bright);
+        font-weight:800;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;
+        transition:background .2s,border-color .2s,transform .2s;
+    }
+    .cancel-find-btn:hover{
+        background:rgba(214,168,90,.14);border-color:rgba(240,201,120,.7);transform:translateY(-1px);
+    }
+    .cancel-results{
+        margin-top:18px;
+    }
+    .cancel-message{
+        padding:14px;border-radius:13px;background:rgba(255,255,255,.04);
+        border:1px solid var(--line);color:var(--muted);font-size:13px;line-height:1.5;
+    }
+    .appointment-result{
+        padding:18px;border-radius:15px;background:rgba(7,9,11,.58);
+        border:1px solid rgba(214,168,90,.22);
+    }
+    .appointment-result-title{
+        color:var(--gold-bright);font-weight:800;font-size:13px;
+        text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;
+    }
+    .appointment-result-details{
+        color:var(--cream);font-size:14px;line-height:1.7;
+    }
+    .appointment-result-details span{color:var(--muted)}
+    .cancel-appointment-btn{
+        width:100%;margin-top:14px;padding:12px 16px;border:1px solid rgba(228,119,119,.5);
+        border-radius:12px;background:rgba(228,119,119,.08);color:var(--danger);
+        font-weight:800;cursor:pointer;
+        transition:background .2s;
+    }
+    .cancel-appointment-btn:hover{background:rgba(228,119,119,.14)}
+    @media(max-width:600px){
+        body{padding:20px 12px}.booking-card{padding:23px 18px;border-radius:22px}h2{font-size:29px}
+        .form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.cancel-grid{grid-template-columns:1fr}
+    }
+    </style>
+</head>
+<body>
+    <main class="booking-shell">
+      <section class="booking-card">
+        <div class="brand">
+          <div class="brand-mark">✂</div>
+          <div>
+            <div class="eyebrow">Premium Barbering</div>
+            <h2>Manage Appointment</h2>
+          </div>
+        </div>
+
+        <p class="intro">
+          Enter the email address you used when booking, your appointment date,
+          and the cancellation code from your confirmation.
+        </p>
+
+        <form id="cancelForm">
+          <div class="form-grid">
+            <div class="field full fade-field">
+              <label for="cancel_email">Email Address</label>
+              <input type="email" id="cancel_email" required
+                     inputmode="email" autocomplete="email"
+                     placeholder="you@example.com">
+            </div>
+
+            <div class="field full fade-field">
+              <label for="cancel_date">Appointment Date</label>
+              <input type="date" id="cancel_date" required>
+            </div>
+
+            <div class="field full fade-field">
+              <label for="cancel_code">Cancellation Code</label>
+              <input type="text" id="cancel_code" required maxlength="6"
+                     autocomplete="off" style="text-transform:uppercase"
+                     placeholder="e.g. A1B2C3">
+            </div>
+          </div>
+
+          <button class="submit-btn" type="submit" id="findAppointmentBtn">
+            Find My Appointment
+          </button>
+
+          <div id="cancelResults" class="cancel-results" aria-live="polite"></div>
+        </form>
+
+        <div class="page-link">
+          Need to book an appointment? <a href="book.html">Book an appointment</a>
+        </div>
+      </section>
+    </main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    // Replace these with the NEW Supabase project's values.
+    const SUPABASE_URL = 'https://ghnkxpsddhmluyoaqtsx.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_zUuj6Jd_CYfjbg2nt_K-VA_mNRGYoVL';
+
+    const _supabase = supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY
+    );
+
+    const form = document.getElementById('cancelForm');
+    const result = document.getElementById('cancelResults');
+    const button = document.getElementById('findAppointmentBtn');
+
+    function normalizeEmail(value) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function formatTime(time) {
+        const [hour, minute] = String(time).split(':').map(Number);
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+    }
+
+    function formatDate(dateString) {
+        return new Date(`${dateString}T12:00:00`).toLocaleDateString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;',
+            '"': '&quot;', "'": '&#039;'
+        }[char]));
+    }
+
+    function showError(message) {
+        result.innerHTML =
+            `<div class="error-message">${escapeHtml(message)}</div>`;
+    }
+
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        const email = normalizeEmail(
+            document.getElementById('cancel_email').value
+        );
+        const date =
+            document.getElementById('cancel_date').value;
+        const code =
+            document.getElementById('cancel_code').value.trim().toUpperCase();
+
+        if (!isValidEmail(email)) {
+            showError('Please enter a valid email address.');
+            return;
+        }
+
+        if (!date) {
+            showError('Please select your appointment date.');
+            return;
+        }
+
+        if (code.length !== 6) {
+            showError('Please enter your 6-character cancellation code.');
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = 'Searching...';
+        result.innerHTML = '';
+
+        try {
+            const { data, error } =
+                await _supabase.functions.invoke(
+                    'cancel-appointment',
+                    {
+                        body: {
+                            action: 'find',
+                            email,
+                            date,
+                            cancellation_code: code
+                        }
+                    }
+                );
+
+            if (error) throw error;
+
+            const appointment = data.appointment;
+
+            result.innerHTML = `
+                <div class="appointment-result">
+                    <div class="appointment-result-title">Appointment Found</div>
+                    <div class="appointment-result-details">
+                        <strong>${escapeHtml(appointment.customer_name)}</strong><br>
+                        <span>Barber:</span> ${escapeHtml(appointment.barber_name)}<br>
+                        <span>Service:</span> ${escapeHtml(appointment.service_name)}<br>
+                        <span>Date:</span> ${escapeHtml(formatDate(appointment.appointment_date))}<br>
+                        <span>Time:</span> ${escapeHtml(formatTime(appointment.appointment_time))}
+                    </div>
+
+                    <button type="button"
+                            class="cancel-appointment-btn"
+                            id="confirmCancelBtn">
+                        Cancel Appointment
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('confirmCancelBtn')
+                .addEventListener('click', async () => {
+                    const confirmBtn =
+                        document.getElementById('confirmCancelBtn');
+
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Cancelling...';
+
+                    try {
+                        const { error: cancelError } =
+                            await _supabase.functions.invoke(
+                                'cancel-appointment',
+                                {
+                                    body: {
+                                        action: 'cancel',
+                                        email,
+                                        date,
+                                        cancellation_code: code
+                                    }
+                                }
+                            );
+
+                        if (cancelError) throw cancelError;
+
+                        result.innerHTML = `
+                            <div class="appointment-result">
+                                <div class="appointment-result-title"
+                                     style="color:var(--danger);">
+                                    Appointment Cancelled
+                                </div>
+                                <div class="appointment-result-details">
+                                    Your appointment for
+                                    <strong>${escapeHtml(appointment.service_name)}</strong>
+                                    on ${escapeHtml(formatDate(appointment.appointment_date))}
+                                    at ${escapeHtml(formatTime(appointment.appointment_time))}
+                                    has been successfully cancelled.
+                                </div>
+                            </div>
+                        `;
+                    } catch (error) {
+                        console.error(error);
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'Cancel Appointment';
+                        showError(
+                            error.message ||
+                            'Unable to cancel the appointment.'
+                        );
+                    }
+                });
+
+        } catch (error) {
+            console.error(error);
+            showError(
+                error.message ||
+                'Unable to find the appointment right now.'
+            );
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Find My Appointment';
+        }
+    });
+
+    document.getElementById('cancel_date').min = new Date().toISOString().slice(0, 10);
+</script>
+</body>
+</html>

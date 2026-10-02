@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book an Appointment</title>
+<style>
+    :root{
+        --bg:#0b0d0f;
+        --panel:rgba(20,23,27,.88);
+        --panel-2:#15191e;
+        --gold:#d6a85a;
+        --gold-bright:#f0c978;
+        --cream:#f5efe5;
+        --muted:#a9adb3;
+        --line:rgba(255,255,255,.09);
+        --danger:#e47777;
+        --shadow:0 24px 70px rgba(0,0,0,.45);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+        margin:0;
+        min-height:100vh;
+        font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        color:var(--cream);
+        background:
+            radial-gradient(circle at 15% 10%,rgba(214,168,90,.16),transparent 30%),
+            radial-gradient(circle at 90% 80%,rgba(214,168,90,.08),transparent 28%),
+            linear-gradient(135deg,#090b0d 0%,#101317 52%,#080a0c 100%);
+        display:flex;
+        justify-content:center;
+        padding:48px 18px;
+        overflow-x:hidden;
+    }
+    body::before{
+        content:"";
+        position:fixed; inset:0; pointer-events:none; opacity:.045;
+        background-image:linear-gradient(rgba(255,255,255,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.5) 1px,transparent 1px);
+        background-size:42px 42px;
+        mask-image:linear-gradient(to bottom,black,transparent 85%);
+    }
+    .booking-shell{width:min(620px,100%);position:relative}
+    .booking-card{
+        position:relative; overflow:hidden;
+        background:linear-gradient(145deg,rgba(25,29,34,.96),rgba(12,14,17,.96));
+        border:1px solid var(--line);
+        border-radius:28px;
+        box-shadow:var(--shadow);
+        padding:34px;
+        animation:cardIn .7s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .booking-card::after{
+        content:""; position:absolute; width:240px;height:240px;border-radius:50%;
+        background:rgba(214,168,90,.09); filter:blur(4px); top:-120px;right:-90px;pointer-events:none;
+    }
+    .brand{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+    .brand-mark{
+        width:48px;height:48px;border:1px solid rgba(214,168,90,.45);border-radius:15px;
+        display:grid;place-items:center;color:var(--gold-bright);font-size:22px;
+        background:rgba(214,168,90,.08);box-shadow:inset 0 0 20px rgba(214,168,90,.05)
+    }
+    .eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:11px;color:var(--gold);font-weight:800}
+    h2{margin:5px 0 0;font-family:Georgia,serif;font-size:34px;line-height:1.1;font-weight:500}
+    .intro{color:var(--muted);font-size:14px;margin:9px 0 28px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .field{position:relative}
+    .field.full{grid-column:1/-1}
+    label{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d8dadd}
+    label::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--gold)}
+    select,input{
+        width:100%;padding:14px 15px;border-radius:13px;border:1px solid rgba(255,255,255,.1);
+        background:rgba(7,9,11,.72);color:var(--cream);outline:none;
+        font:inherit;transition:border-color .25s,box-shadow .25s,transform .25s,background .25s;
+    }
+    select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:38px}
+    input[type=date]{color-scheme:dark}
+    select:focus,input:focus{border-color:rgba(240,201,120,.75);box-shadow:0 0 0 4px rgba(214,168,90,.11);background:rgba(12,15,18,.95);transform:translateY(-1px)}
+    option{background:#14181c;color:var(--cream)}
+    option:disabled{color:#777;background:#202328}
+    .time-wrap{position:relative}
+    .availability{margin-top:8px;color:var(--muted);font-size:12px;min-height:18px}
+    .submit-btn{
+        position:relative;width:100%;margin-top:25px;padding:16px 20px;border:0;border-radius:14px;
+        background:linear-gradient(135deg,var(--gold-bright),var(--gold));color:#14110a;
+        font-weight:900;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
+        box-shadow:0 12px 30px rgba(214,168,90,.18);overflow:hidden;
+        transition:transform .25s,box-shadow .25s,filter .25s;
+    }
+    .submit-btn::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.42) 50%,transparent 75%);transform:translateX(-120%);transition:transform .6s}
+    .submit-btn:hover{transform:translateY(-2px);box-shadow:0 17px 38px rgba(214,168,90,.27);filter:saturate(1.08)}
+    .submit-btn:hover::before{transform:translateX(120%)}
+    .submit-btn:active{transform:translateY(0)}
+    .note{text-align:center;color:#777d84;font-size:11px;margin:18px 0 0}
+    .fade-field{animation:fieldIn .55s both}
+    .fade-field:nth-child(2){animation-delay:.05s}.fade-field:nth-child(3){animation-delay:.1s}.fade-field:nth-child(4){animation-delay:.15s}
+    .fade-field:nth-child(5){animation-delay:.2s}.fade-field:nth-child(6){animation-delay:.25s}
+    @keyframes cardIn{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+    @keyframes fieldIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .cancel-divider{
+        height:1px;background:var(--line);margin:32px 0 28px;
+    }
+    .cancel-section h3{
+        margin:6px 0 8px;font-family:Georgia,serif;font-size:27px;font-weight:500;
+    }
+    .cancel-intro{
+        color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 20px;
+    }
+    .cancel-grid{
+        display:grid;grid-template-columns:1fr 1fr;gap:16px;
+    }
+    .cancel-find-btn{
+        width:100%;margin-top:18px;padding:14px 18px;border:1px solid rgba(214,168,90,.45);
+        border-radius:13px;background:rgba(214,168,90,.08);color:var(--gold-bright);
+        font-weight:800;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;
+        transition:background .2s,border-color .2s,transform .2s;
+    }
+    .cancel-find-btn:hover{
+        background:rgba(214,168,90,.14);border-color:rgba(240,201,120,.7);transform:translateY(-1px);
+    }
+    .cancel-results{
+        margin-top:18px;
+    }
+    .cancel-message{
+        padding:14px;border-radius:13px;background:rgba(255,255,255,.04);
+        border:1px solid var(--line);color:var(--muted);font-size:13px;line-height:1.5;
+    }
+    .appointment-result{
+        padding:18px;border-radius:15px;background:rgba(7,9,11,.58);
+        border:1px solid rgba(214,168,90,.22);
+    }
+    .appointment-result-title{
+        color:var(--gold-bright);font-weight:800;font-size:13px;
+        text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;
+    }
+    .appointment-result-details{
+        color:var(--cream);font-size:14px;line-height:1.7;
+    }
+    .appointment-result-details span{color:var(--muted)}
+    .cancel-appointment-btn{
+        width:100%;margin-top:14px;padding:12px 16px;border:1px solid rgba(228,119,119,.5);
+        border-radius:12px;background:rgba(228,119,119,.08);color:var(--danger);
+        font-weight:800;cursor:pointer;
+        transition:background .2s;
+    }
+    .cancel-appointment-btn:hover{background:rgba(228,119,119,.14)}
+    @media(max-width:600px){
+        body{padding:20px 12px}.booking-card{padding:23px 18px;border-radius:22px}h2{font-size:29px}
+        .form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.cancel-grid{grid-template-columns:1fr}
+    }
+    </style>
+</head>
+<body>
+    <main class="booking-shell">
+      <section class="booking-card">
+        <div class="brand">
+          <div class="brand-mark">✂</div>
+          <div>
+            <div class="eyebrow">Premium Barbering</div>
+            <h2>Book an Appointment</h2>
+          </div>
+        </div>
+
+        <p class="intro">Choose your barber, service, date and time. We’ll take care of the rest.</p>
+
+        <form id="bookingForm">
+          <div class="form-grid">
+
+            <div class="field full fade-field">
+              <label for="customer_name">Full Name</label>
+              <input type="text" id="customer_name" required autocomplete="name">
+            </div>
+
+            <div class="field full fade-field">
+              <label for="customer_email">Email Address</label>
+              <input type="email" id="customer_email" required
+                     inputmode="email" autocomplete="email"
+                     placeholder="you@example.com">
+            </div>
+
+            <div class="field full fade-field">
+              <label for="customer_phone">Phone Number</label>
+              <input type="tel" id="customer_phone" required
+                     inputmode="tel" autocomplete="tel"
+                     placeholder="(555) 555-5555">
+            </div>
+
+            <div class="field full fade-field">
+              <div class="check-field">
+                <input type="checkbox" id="phone_consent" required>
+                <label for="phone_consent">
+                  I consent to being contacted by phone or text at the number provided
+                  if the barber needs to reach me about my appointment.
+                </label>
+              </div>
+            </div>
+
+            <div class="field fade-field">
+              <label for="barber">Select Barber</label>
+              <select id="barber" required>
+                <option value="">-- Choose Barber --</option>
+              </select>
+            </div>
+
+            <div class="field fade-field">
+              <label for="service">Select Service</label>
+              <select id="service" required disabled>
+                <option value="">-- Choose Service --</option>
+              </select>
+            </div>
+
+            <div class="field fade-field">
+              <label for="appointment_date">Date (Tue - Sat)</label>
+              <input type="date" id="appointment_date" required disabled>
+            </div>
+
+            <div class="field fade-field">
+              <label for="appointment_time">Select Time</label>
+              <select id="appointment_time" required disabled>
+                <option value="">-- Select a barber and date first --</option>
+              </select>
+              <div class="availability" id="availabilityHint">
+                Select a barber and date to view availability.
+              </div>
+            </div>
+
+          </div>
+
+          <button class="submit-btn" type="submit" id="submitBtn">Confirm Booking</button>
+          <p class="note">Appointments available Tuesday through Saturday · 10:00 AM–6:00 PM</p>
+          <div id="bookingResult" class="cancel-results" aria-live="polite"></div>
+        </form>
+
+        <div class="page-link">
+          Need to cancel an appointment? <a href="cancel.html">Manage your appointment</a>
+        </div>
+      </section>
+    </main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    // ==========================================================
+    // V2 SUPABASE CONFIGURATION
+    // Replace these two placeholders with the NEW project's
+    // Project URL and Publishable key.
+    // ==========================================================
+    const SUPABASE_URL = 'https://ghnkxpsddhmluyoaqtsx.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_zUuj6Jd_CYfjbg2nt_K-VA_mNRGYoVL';
+
+    const _supabase = supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY
+    );
+
+    const bookingForm = document.getElementById('bookingForm');
+    const barberSelect = document.getElementById('barber');
+    const serviceSelect = document.getElementById('service');
+    const dateInput = document.getElementById('appointment_date');
+    const timeSelect = document.getElementById('appointment_time');
+    const availabilityHint = document.getElementById('availabilityHint');
+    const bookingResult = document.getElementById('bookingResult');
+    const submitBtn = document.getElementById('submitBtn');
+
+    const allSlots = [];
+    for (let hour = 10; hour < 18; hour++) {
+        for (const minute of [0, 30]) {
+            allSlots.push({
+                value: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+                minutes: hour * 60 + minute
+            });
+        }
+    }
+
+    let availability = {
+        appointments: [],
+        blocks: []
+    };
+
+    function normalizeEmail(value) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function formatTime(time) {
+        const [hour, minute] = String(time).split(':').map(Number);
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(`${dateString}T12:00:00`);
+        return date.toLocaleDateString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function getLocalDateString(date = new Date()) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function getLocalMinutes() {
+        const now = new Date();
+        return now.getHours() * 60 + now.getMinutes();
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;',
+            '"': '&quot;', "'": '&#039;'
+        }[char]));
+    }
+
+    function parseTimeMinutes(time) {
+        const [h, m] = String(time).split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    function serviceDuration() {
+        const option = serviceSelect.options[serviceSelect.selectedIndex];
+        return Number(option?.dataset.duration || 0);
+    }
+
+    function rangesOverlap(startA, endA, startB, endB) {
+        return startA < endB && startB < endA;
+    }
+
+    function slotUnavailable(startMinutes, duration) {
+        const endMinutes = startMinutes + duration;
+
+        if (endMinutes > 18 * 60) return 'unavailable';
+
+        for (const appointment of availability.appointments) {
+            const start = parseTimeMinutes(appointment.appointment_time);
+            const end = start + Number(appointment.duration_minutes);
+            if (rangesOverlap(startMinutes, endMinutes, start, end)) {
+                return 'booked';
+            }
+        }
+
+        for (const block of availability.blocks) {
+            const start = parseTimeMinutes(block.start_time);
+            const end = parseTimeMinutes(block.end_time);
+            if (rangesOverlap(startMinutes, endMinutes, start, end)) {
+                return 'blocked';
+            }
+        }
+
+        return null;
+    }
+
+    function renderTimeSlots() {
+        const barberId = barberSelect.value;
+        const date = dateInput.value;
+        const duration = serviceDuration();
+
+        timeSelect.innerHTML = '<option value="">-- Choose Time --</option>';
+        timeSelect.disabled = !barberId || !date || !duration;
+
+        if (!barberId || !date) {
+            availabilityHint.textContent = 'Select a barber and date to view availability.';
+            return;
+        }
+
+        if (!duration) {
+            availabilityHint.textContent = 'Choose a service to view available times.';
+            return;
+        }
+
+        const today = getLocalDateString();
+        const isToday = date === today;
+        const nowMinutes = getLocalMinutes();
+        let availableCount = 0;
+
+        for (const slot of allSlots) {
+            const option = document.createElement('option');
+            option.value = slot.value;
+            option.textContent = formatTime(slot.value);
+
+            if (isToday && slot.minutes <= nowMinutes) {
+                option.disabled = true;
+                option.textContent += ' (Past)';
+            } else {
+                const reason = slotUnavailable(slot.minutes, duration);
+
+                if (reason === 'booked') {
+                    option.disabled = true;
+                    option.textContent += ' (Booked)';
+                } else if (reason === 'blocked') {
+                    option.disabled = true;
+                    option.textContent += ' (Unavailable)';
+                } else if (reason === 'unavailable') {
+                    option.disabled = true;
+                    option.textContent += ' (Too late)';
+                } else {
+                    availableCount++;
+                }
+            }
+
+            timeSelect.appendChild(option);
+        }
+
+        timeSelect.disabled = false;
+
+        availabilityHint.textContent = availableCount
+            ? `${availableCount} time slot${availableCount === 1 ? '' : 's'} available.`
+            : 'No appointment times are available for this date and service.';
+    }
+
+    async function loadBarbers() {
+        const { data, error } = await _supabase
+            .from('barbers')
+            .select('id, name')
+            .eq('active', true)
+            .order('name');
+
+        if (error) {
+            console.error(error);
+            bookingResult.innerHTML =
+                '<div class="error-message">Unable to load the barbers. Please try again.</div>';
+            return;
+        }
+
+        data.forEach(barber => {
+            const option = document.createElement('option');
+            option.value = barber.id;
+            option.textContent = barber.name;
+            barberSelect.appendChild(option);
+        });
+    }
+
+    async function loadServices() {
+        const { data, error } = await _supabase
+            .from('services')
+            .select('id, name, duration_minutes')
+            .eq('active', true)
+            .order('name');
+
+        if (error) {
+            console.error(error);
+            bookingResult.innerHTML =
+                '<div class="error-message">Unable to load the services. Please try again.</div>';
+            return;
+        }
+
+        data.forEach(service => {
+            const option = document.createElement('option');
+            option.value = service.id;
+            option.dataset.duration = service.duration_minutes;
+
+            const durationText =
+                service.duration_minutes === 60
+                    ? '1 hour'
+                    : `${service.duration_minutes} mins`;
+
+            option.textContent = `${service.name} (${durationText})`;
+            serviceSelect.appendChild(option);
+        });
+
+        serviceSelect.disabled = false;
+    }
+
+    async function checkAvailability() {
+        const barberId = barberSelect.value;
+        const date = dateInput.value;
+
+        availability = { appointments: [], blocks: [] };
+        timeSelect.value = '';
+
+        if (!barberId || !date) {
+            renderTimeSlots();
+            return;
+        }
+
+        const selectedDate = new Date(`${date}T12:00:00`);
+        const day = selectedDate.getDay();
+
+        if (day === 0 || day === 1) {
+            timeSelect.innerHTML = '<option value="">-- Shop Closed --</option>';
+            timeSelect.disabled = true;
+            availabilityHint.textContent = 'We are closed on Sundays and Mondays.';
+            return;
+        }
+
+        availabilityHint.textContent = 'Checking availability...';
+
+        const { data, error } = await _supabase.rpc(
+            'get_booking_availability',
+            {
+                p_barber_id: barberId,
+                p_date: date
+            }
+        );
+
+        if (error) {
+            console.error(error);
+            timeSelect.innerHTML =
+                '<option value="">-- Unable to load availability --</option>';
+            timeSelect.disabled = true;
+            availabilityHint.textContent =
+                'Unable to load availability. Please try again.';
+            return;
+        }
+
+        availability.appointments = (data || [])
+            .filter(row => row.appointment_time)
+            .map(row => ({
+                appointment_time: row.appointment_time,
+                duration_minutes: row.duration_minutes
+            }));
+
+        availability.blocks = (data || [])
+            .filter(row => row.block_start && row.block_end)
+            .map(row => ({
+                start_time: row.block_start,
+                end_time: row.block_end
+            }));
+
+        renderTimeSlots();
+    }
+
+    barberSelect.addEventListener('change', () => {
+        dateInput.disabled = !barberSelect.value;
+        if (!barberSelect.value) {
+            dateInput.value = '';
+        }
+        checkAvailability();
+    });
+
+    serviceSelect.addEventListener('change', renderTimeSlots);
+    dateInput.addEventListener('change', checkAvailability);
+
+    bookingForm.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        const name = document.getElementById('customer_name').value.trim();
+        const email = normalizeEmail(document.getElementById('customer_email').value);
+        const phone = document.getElementById('customer_phone').value.trim();
+        const consent = document.getElementById('phone_consent').checked;
+        const barberId = barberSelect.value;
+        const serviceId = serviceSelect.value;
+        const date = dateInput.value;
+        const time = timeSelect.value;
+
+        if (!name || !phone || !barberId || !serviceId || !date || !time) {
+            bookingResult.innerHTML =
+                '<div class="error-message">Please complete all required fields.</div>';
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            bookingResult.innerHTML =
+                '<div class="error-message">Please enter a valid email address.</div>';
+            return;
+        }
+
+        if (!consent) {
+            bookingResult.innerHTML =
+                '<div class="error-message">Please consent to being contacted by phone or text.</div>';
+            return;
+        }
+
+        const selectedDate = new Date(`${date}T12:00:00`);
+        if (selectedDate.getDay() === 0 || selectedDate.getDay() === 1) {
+            bookingResult.innerHTML =
+                '<div class="error-message">We are closed on Sundays and Mondays.</div>';
+            return;
+        }
+
+        const slotMinutes = parseTimeMinutes(time);
+        const duration = serviceDuration();
+
+        if (date === getLocalDateString() && slotMinutes <= getLocalMinutes()) {
+            bookingResult.innerHTML =
+                '<div class="error-message">That appointment time has already passed. Please choose another time.</div>';
+            await checkAvailability();
+            return;
+        }
+
+        if (slotUnavailable(slotMinutes, duration)) {
+            bookingResult.innerHTML =
+                '<div class="error-message">That time is no longer available. Please choose another time.</div>';
+            await checkAvailability();
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Booking...';
+        bookingResult.innerHTML = '';
+
+        try {
+            const { data, error } = await _supabase.functions.invoke(
+                'book-appointment',
+                {
+                    body: {
+                        customer_name: name,
+                        customer_email: email,
+                        customer_phone: phone,
+                        phone_consent: true,
+                        barber_id: barberId,
+                        service_id: serviceId,
+                        appointment_date: date,
+                        appointment_time: time
+                    }
+                }
+            );
+
+            if (error) throw error;
+
+            const appointment = data.appointment;
+
+            bookingResult.innerHTML = `
+                <div class="appointment-result">
+                    <div class="success-icon">✓</div>
+                    <div class="appointment-result-title">Appointment Confirmed</div>
+                    <div class="appointment-result-details">
+                        <strong>${escapeHtml(name)}</strong><br>
+                        <span>Barber:</span> ${escapeHtml(barberSelect.options[barberSelect.selectedIndex].text)}<br>
+                        <span>Service:</span> ${escapeHtml(serviceSelect.options[serviceSelect.selectedIndex].text)}<br>
+                        <span>Date:</span> ${escapeHtml(formatDate(appointment.appointment_date))}<br>
+                        <span>Time:</span> ${escapeHtml(formatTime(appointment.appointment_time))}<br><br>
+                        <span>Cancellation Code:</span><br>
+                        <strong style="font-size:20px;letter-spacing:.08em;">
+                            ${escapeHtml(appointment.cancellation_code)}
+                        </strong><br><br>
+                        <span>Your confirmation will be emailed to ${escapeHtml(email)} once email delivery is enabled.</span>
+                    </div>
+                </div>
+            `;
+
+            bookingForm.reset();
+            dateInput.disabled = true;
+            serviceSelect.disabled = false;
+            timeSelect.innerHTML =
+                '<option value="">-- Select a barber and date first --</option>';
+            timeSelect.disabled = true;
+            availability = { appointments: [], blocks: [] };
+
+        } catch (error) {
+            console.error('Booking error:', error);
+            bookingResult.innerHTML =
+                `<div class="error-message">${escapeHtml(error.message || 'Unable to book the appointment. Please try again.')}</div>`;
+            await checkAvailability();
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Confirm Booking';
+        }
+    });
+
+    dateInput.min = getLocalDateString();
+    loadBarbers();
+    loadServices();
+</script>
+</body>
+</html>
