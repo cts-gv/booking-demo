@@ -65,6 +65,24 @@ button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:point
       </table>
     </div>
   </div>
+
+  <div class="panel">
+    <h2>Time Off</h2>
+    <div class="subtitle" style="margin-bottom:14px">Block days or hours so customers can't book them.</div>
+    <div class="controls">
+      <div class="field"><label>Barber</label><select id="blockBarber"></select></div>
+      <div class="field small"><label>From</label><input id="blockStart" type="date"></div>
+      <div class="field small"><label>To (optional)</label><input id="blockEnd" type="date"></div>
+      <div class="field small"><label>Start time</label><input id="blockFrom" type="time" value="09:00"></div>
+      <div class="field small"><label>End time</label><input id="blockTo" type="time" value="17:00"></div>
+      <div class="field"><label>Reason (optional)</label><input id="blockReason" placeholder="Vacation, appointment..."></div>
+      <label style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input id="blockAllDay" type="checkbox" style="width:auto" checked> All day</label>
+      <button id="addBlockBtn">Add Time Off</button>
+    </div>
+    <div id="blockMessage" class="message"></div>
+    <div class="table-wrap"><table style="min-width:600px"><thead><tr><th>Barber</th><th>When</th><th>Reason</th><th>Action</th></tr></thead>
+      <tbody id="blocksBody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody></table></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -87,7 +105,7 @@ async function invokeAdmin(action, extra={}){
   const {data:{session}}=await _supabase.auth.getSession();
   if(!session) throw new Error('Your session has expired. Please sign in again.');
   const {data,error}=await _supabase.functions.invoke('admin-appointments',{body:{action,...extra}});
-  if(error) throw new Error(error.message||'Admin request failed.');
+  if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch{}throw new Error(m||'Admin request failed.')}
   if(data?.error) throw new Error(data.error);
   return data;
 }
@@ -96,6 +114,7 @@ async function loadBarbers(){
   const {data,error}=await _supabase.from('barbers').select('id,name').eq('active',true).order('name');
   if(error) throw error;
   barbers=data||[];
+  $('blockBarber').innerHTML=barbers.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
   $('barberFilter').innerHTML='<option value="">All barbers</option>'+barbers.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
@@ -152,12 +171,54 @@ $('loginForm').addEventListener('submit',async e=>{
   }catch(e){msg($('loginMessage'),e.message)}
 });
 $('logoutBtn').onclick=()=>_supabase.auth.signOut();
-$('refreshBtn').onclick=loadAppointments;
+$('refreshBtn').onclick=()=>{loadAppointments();loadBlocks()};
 $('dateFilter').oninput=loadAppointments;$('viewFilter').onchange=loadAppointments;$('barberFilter').onchange=render;$('searchFilter').oninput=render;
 $('clearBtn').onclick=()=>{$('dateFilter').value='';$('barberFilter').value='';$('searchFilter').value='';$('viewFilter').value='upcoming';loadAppointments()};
 
+let blocks=[],blockGroups=[];
+function fmtRange(g){return g.start===g.end?formatDate(g.start):formatDate(g.start)+' – '+formatDate(g.end)}
+function groupBlocks(){
+  const sorted=[...blocks].sort((a,b)=>a.barber_id.localeCompare(b.barber_id)||a.start_time.localeCompare(b.start_time)||String(a.reason||'').localeCompare(String(b.reason||''))||a.block_date.localeCompare(b.block_date));
+  const groups=[];
+  for(const b of sorted){
+    const g=groups[groups.length-1];
+    const next=g&&new Date(new Date(g.end+'T12:00:00Z').getTime()+864e5).toISOString().slice(0,10);
+    if(g&&g.barber_id===b.barber_id&&g.start_time===b.start_time&&g.end_time===b.end_time&&(g.reason||'')===(b.reason||'')&&next===b.block_date){g.end=b.block_date;g.ids.push(b.id)}
+    else groups.push({barber_id:b.barber_id,barber_name:b.barber_name,start:b.block_date,end:b.block_date,start_time:b.start_time,end_time:b.end_time,reason:b.reason,ids:[b.id]});
+  }
+  return groups.sort((a,b)=>a.start.localeCompare(b.start));
+}
+function renderBlocks(){
+  blockGroups=groupBlocks();
+  $('blocksBody').innerHTML=blockGroups.length?blockGroups.map((g,i)=>{
+    const allDay=g.start_time.slice(0,5)==='00:00'&&g.end_time.slice(0,5)==='23:59';
+    return `<tr><td>${escapeHtml(g.barber_name||g.barber_id)}</td><td><strong>${fmtRange(g)}</strong><br><span class="muted">${allDay?'All day':formatTime(g.start_time)+' – '+formatTime(g.end_time)}</span></td><td>${escapeHtml(g.reason||'—')}</td><td><button class="danger" onclick="removeBlock(${i})">Remove</button></td></tr>`}).join(''):'<tr><td colspan="4" class="muted">No upcoming time off.</td></tr>';
+}
+async function loadBlocks(){
+  try{const d=await invokeAdmin('list_blocks',{today:localDateString()});blocks=d.blocks||[];renderBlocks()}
+  catch(e){msg($('blockMessage'),e.message)}
+}
+async function removeBlock(i){
+  const g=blockGroups[i]; if(!g)return;
+  if(!confirm(`Remove ${g.barber_name||'this barber'}'s time off (${fmtRange(g)})?`))return;
+  try{await invokeAdmin('delete_blocks',{ids:g.ids});await loadBlocks();msg($('blockMessage'),'Time off removed.','ok')}
+  catch(e){msg($('blockMessage'),e.message)}
+}
+$('blockAllDay').onchange=()=>{$('blockFrom').disabled=$('blockTo').disabled=$('blockAllDay').checked};
+$('blockAllDay').onchange();
+$('addBlockBtn').onclick=async()=>{
+  clearMsg($('blockMessage'));
+  try{
+    const d=await invokeAdmin('add_block',{barber_id:$('blockBarber').value,start_date:$('blockStart').value,end_date:$('blockEnd').value||$('blockStart').value,all_day:$('blockAllDay').checked,start_time:$('blockFrom').value,end_time:$('blockTo').value,reason:$('blockReason').value});
+    $('blockReason').value='';
+    await loadBlocks();
+    const c=d.conflicts||[];
+    msg($('blockMessage'),c.length?'Time off added, but these existing appointments overlap it (cancel them above if needed): '+c.map(a=>`${a.customer_name} – ${formatDate(a.appointment_date)} ${formatTime(a.appointment_time)}`).join('; '):'Time off added.',c.length?'error':'ok');
+  }catch(e){msg($('blockMessage'),e.message)}
+};
+
 _supabase.auth.onAuthStateChange(async (_event,session)=>{
-  if(session){$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');try{await loadBarbers();await loadAppointments()}catch(e){msg($('appMessage'),e.message)}}
+  if(session){$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');try{await loadBarbers();await loadAppointments();await loadBlocks()}catch(e){msg($('appMessage'),e.message)}}
   else{$('appView').classList.add('hidden');$('loginView').classList.remove('hidden')}
 });
 </script>
