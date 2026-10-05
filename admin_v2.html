@@ -316,8 +316,8 @@ $('logoutBtn').onclick=async()=>{
   await _supabase.auth.signOut();
 };
 $('refreshBtn').onclick=()=>{loadAppointments();loadBlocks()};
-$('dateFilter').oninput=loadAppointments;$('viewFilter').onchange=loadAppointments;$('barberFilter').onchange=render;$('searchFilter').oninput=render;
-$('clearBtn').onclick=()=>{$('dateFilter').value='';$('barberFilter').value='';$('searchFilter').value='';$('viewFilter').value='upcoming';loadAppointments()};
+$('dateFilter').oninput=()=>{previousAppointmentIds=null;loadAppointments()};$('viewFilter').onchange=()=>{previousAppointmentIds=null;loadAppointments()};$('barberFilter').onchange=render;$('searchFilter').oninput=render;
+$('clearBtn').onclick=()=>{$('dateFilter').value='';$('barberFilter').value='';$('searchFilter').value='';$('viewFilter').value='upcoming';previousAppointmentIds=null;loadAppointments()};
 
 let blocks=[],blockGroups=[];
 function fmtRange(g){return g.start===g.end?formatDate(g.start):formatDate(g.start)+' – '+formatDate(g.end)}
@@ -361,23 +361,37 @@ $('addBlockBtn').onclick=async()=>{
   }catch(e){msg($('blockMessage'),e.message)}
 };
 
-_supabase.auth.onAuthStateChange(async (_event,session)=>{
+let dashboardActive = false;
+_supabase.auth.onAuthStateChange((_event,session)=>{
   if(session){
+    // Supabase re-fires SIGNED_IN on tab refocus and TOKEN_REFRESHED periodically.
+    // Only do the full startup (and reset the baseline) on a real sign-in.
+    if(dashboardActive) return;
+    dashboardActive = true;
     $('loginView').classList.add('hidden');
     $('appView').classList.remove('hidden');
     previousAppointmentIds=null;
-    try{
-      await loadBarbers();
-      await loadAppointments();
-      await loadBlocks();
-      startAppointmentPolling();
-    }catch(e){msg($('appMessage'),e.message)}
+    // Run outside the auth callback so Supabase calls inside it don't deadlock.
+    setTimeout(async ()=>{
+      try{
+        await loadBarbers();
+        await loadAppointments();
+        await loadBlocks();
+        startAppointmentPolling();
+      }catch(e){msg($('appMessage'),e.message)}
+    },0);
   } else {
+    dashboardActive = false;
     stopAppointmentPolling();
     previousAppointmentIds=null;
     $('appView').classList.add('hidden');
     $('loginView').classList.remove('hidden');
   }
+});
+
+// Check immediately when returning to the tab instead of waiting for the next poll.
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && dashboardActive) loadAppointments({fromPoll:true});
 });
 </script>
 </body>
