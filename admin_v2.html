@@ -137,12 +137,31 @@ function ensureAudioContext(){
   return audioContext;
 }
 
+// Browsers keep audio suspended until the user interacts with the page.
+// Unlock it on the first click/tap/keypress so polling-triggered sounds can play.
+function unlockAudio(){
+  const ctx = ensureAudioContext();
+  if(!ctx) return;
+  ctx.resume().then(()=>{
+    if(ctx.state === 'running'){
+      ['pointerdown','keydown','touchstart'].forEach(ev => document.removeEventListener(ev, unlockAudio, true));
+    }
+  }).catch(()=>{});
+}
+['pointerdown','keydown','touchstart'].forEach(ev => document.addEventListener(ev, unlockAudio, true));
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && audioContext && audioContext.state === 'suspended') audioContext.resume().catch(()=>{});
+});
+
 // A short two-note chime: noticeable, but intentionally brief and not harsh.
 function playAppointmentSound(){
   if(!soundEnabled) return;
   const ctx = ensureAudioContext();
   if(!ctx) return;
 
+  if(ctx.state !== 'running'){
+    console.warn('Appointment sound blocked: click anywhere on the page once to enable audio.');
+  }
   const now = ctx.currentTime;
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.0001, now);
