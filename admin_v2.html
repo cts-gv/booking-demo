@@ -216,7 +216,7 @@ function startAppointmentPolling(){
   pollingTimer = setInterval(()=>{
     if(document.hidden) return;
     loadAppointments({fromPoll:true});
-  }, 30000);
+  }, 10000);
 }
 
 function stopAppointmentPolling(){
