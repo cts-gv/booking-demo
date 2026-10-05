@@ -15,6 +15,14 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--border);border-
 button{border:0;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer;background:var(--gold);color:#111}button:hover{background:var(--gold2)}button.secondary{background:#29282d;color:var(--text);border:1px solid var(--border)}button.danger{background:#6d2f32;color:#fff}.actions{display:flex;gap:8px;flex-wrap:wrap}
 .table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:850px}th,td{padding:12px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{color:var(--gold2);font-size:13px;text-transform:uppercase;letter-spacing:.04em}td{font-size:14px}.muted{color:var(--muted)}.status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:#263c31;color:#a9e5c5}.status.cancelled{background:#432528;color:#f2aaaa}
 .login{max-width:420px;margin:10vh auto}.message{padding:10px 12px;border-radius:9px;margin-top:12px;display:none}.message.error{display:block;background:#402528;color:#ffb5b5}.message.ok{display:block;background:#20372d;color:#a8e4c2}.hidden{display:none!important}
+    .notification-controls{display:flex;align-items:center;gap:10px}
+    .sound-toggle{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:#29282d;color:var(--text);cursor:pointer;font-weight:700}
+    .sound-toggle:hover{background:#35343a}
+    .sound-toggle .sound-dot{width:9px;height:9px;border-radius:50%;background:#777}
+    .sound-toggle.on .sound-dot{background:var(--ok);box-shadow:0 0 8px rgba(116,198,157,.65)}
+    @keyframes newAppointmentFlash{0%,100%{background:transparent}20%{background:rgba(228,196,92,.28)}45%{background:rgba(228,196,92,.12)}70%{background:rgba(228,196,92,.24)}}
+    #appointmentsBody tr.new-appointment-flash td{animation:newAppointmentFlash 2.2s ease-in-out}
+    #appointmentsBody tr.new-appointment-flash{outline:1px solid rgba(228,196,92,.45);outline-offset:-1px}
 @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.top{align-items:flex-start;flex-direction:column}}@media(max-width:500px){.grid{grid-template-columns:1fr 1fr}.container{padding:18px 12px}}
   .table-wrap{max-height:560px}
 th{position:sticky;top:0;background:#151519}
@@ -37,7 +45,13 @@ th{position:sticky;top:0;background:#151519}
 <div id="appView" class="container hidden">
   <div class="top">
     <div><h1>Barber Shop Admin</h1><div class="subtitle">Appointments and schedule</div></div>
-    <div class="actions"><button id="refreshBtn" class="secondary">Refresh</button><button id="logoutBtn" class="secondary">Sign Out</button></div>
+    <div class="actions">
+        <button id="soundToggle" class="sound-toggle on" type="button" title="Toggle new appointment sound">
+          <span class="sound-dot"></span><span id="soundToggleText">Sound On</span>
+        </button>
+        <button id="refreshBtn" class="secondary">Refresh</button>
+        <button id="logoutBtn" class="secondary">Sign Out</button>
+      </div>
   </div>
 
   <div class="grid">
@@ -96,7 +110,100 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let allAppointments = [];
 let barbers = [];
 
+// New-appointment notification state.
+let previousAppointmentIds = null;
+let soundEnabled = localStorage.getItem('adminAppointmentSound') !== 'off';
+let audioContext = null;
+let pollingTimer = null;
+let highlightedAppointmentIds = new Set();
+
 const $ = id => document.getElementById(id);
+
+function updateSoundToggle(){
+  const btn = $('soundToggle');
+  if(!btn) return;
+  btn.classList.toggle('on', soundEnabled);
+  $('soundToggleText').textContent = soundEnabled ? 'Sound On' : 'Sound Off';
+  btn.setAttribute('aria-pressed', String(soundEnabled));
+}
+
+function ensureAudioContext(){
+  if(!audioContext){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return null;
+    audioContext = new AudioCtx();
+  }
+  if(audioContext.state === 'suspended') audioContext.resume().catch(()=>{});
+  return audioContext;
+}
+
+// A short two-note chime: noticeable, but intentionally brief and not harsh.
+function playAppointmentSound(){
+  if(!soundEnabled) return;
+  const ctx = ensureAudioContext();
+  if(!ctx) return;
+
+  const now = ctx.currentTime;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+  gain.connect(ctx.destination);
+
+  [659.25, 783.99].forEach((frequency, index)=>{
+    const osc = ctx.createOscillator();
+    const start = now + index * 0.13;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, start);
+    osc.connect(gain);
+    osc.start(start);
+    osc.stop(start + 0.24);
+  });
+}
+
+function highlightNewAppointments(ids){
+  if(!ids.length) return;
+  ids.forEach(id => highlightedAppointmentIds.add(id));
+  render();
+
+  setTimeout(()=>{
+    ids.forEach(id => highlightedAppointmentIds.delete(id));
+    render();
+  }, 2300);
+}
+
+function detectNewAppointments(appointments){
+  const currentIds = new Set((appointments || []).map(a => String(a.id)));
+
+  // The first successful load establishes the baseline and never makes a sound.
+  if(previousAppointmentIds === null){
+    previousAppointmentIds = currentIds;
+    return;
+  }
+
+  const newIds = [...currentIds].filter(id => !previousAppointmentIds.has(id));
+  previousAppointmentIds = currentIds;
+
+  if(!newIds.length) return;
+
+  playAppointmentSound();
+  highlightNewAppointments(newIds);
+}
+
+function startAppointmentPolling(){
+  if(pollingTimer) clearInterval(pollingTimer);
+  pollingTimer = setInterval(()=>{
+    if(document.hidden) return;
+    loadAppointments({fromPoll:true});
+  }, 10000);
+}
+
+function stopAppointmentPolling(){
+  if(pollingTimer){
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+}
 function msg(el, text, type='error'){el.textContent=text;el.className='message '+type}
 function clearMsg(el){el.textContent='';el.className='message'}
 function localDateString(d=new Date()){const x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)}
@@ -121,16 +228,20 @@ async function loadBarbers(){
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 
-async function loadAppointments(){
-  clearMsg($('appMessage'));
+async function loadAppointments({fromPoll=false}={}){
+  if(!fromPoll) clearMsg($('appMessage'));
   try{
     const data=await invokeAdmin('list',{view:$('viewFilter').value,today:localDateString(),date:$('dateFilter').value||null});
-    allAppointments=data.appointments||[];
+    const appointments=data.appointments||[];
+    detectNewAppointments(appointments);
+    allAppointments=appointments;
     renderStats(data.stats);
     render();
     if(data.truncated) msg($('appMessage'),'Showing the first '+allAppointments.length+' results. Use the Show menu or date filter to narrow the list.');
     $('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
-  }catch(e){msg($('appMessage'),e.message)}
+  }catch(e){
+    if(!fromPoll) msg($('appMessage'),e.message);
+  }
 }
 
 function renderStats(s){if(!s)return;$('todayCount').textContent=s.today;$('upcomingCount').textContent=s.upcoming;$('cancelledCount').textContent=s.cancelled_upcoming;$('pastCount').textContent=s.past}
@@ -147,7 +258,7 @@ function render(){
   }).sort((a,b)=>{const c=`${a.appointment_date} ${a.appointment_time}`.localeCompare(`${b.appointment_date} ${b.appointment_time}`);return asc?c:-c});
 
   $('appointmentsBody').innerHTML=rows.length?rows.map(a=>`
-    <tr>
+    <tr class="${highlightedAppointmentIds.has(String(a.id))?'new-appointment-flash':''}">
       <td><strong>${formatDate(a.appointment_date)}</strong><br>${formatTime(a.appointment_time)}</td>
       <td>${escapeHtml(a.customer_name)}<br><span class="muted">${escapeHtml(a.customer_email)}</span></td>
       <td>${escapeHtml(a.barber_name||a.barber_id)}</td>
@@ -172,7 +283,19 @@ $('loginForm').addEventListener('submit',async e=>{
     if(error)throw error;
   }catch(e){msg($('loginMessage'),e.message)}
 });
-$('logoutBtn').onclick=()=>_supabase.auth.signOut();
+$('soundToggle').onclick=()=>{
+  soundEnabled=!soundEnabled;
+  localStorage.setItem('adminAppointmentSound', soundEnabled?'on':'off');
+  updateSoundToggle();
+  if(soundEnabled) playAppointmentSound();
+};
+updateSoundToggle();
+
+$('logoutBtn').onclick=async()=>{
+  stopAppointmentPolling();
+  previousAppointmentIds=null;
+  await _supabase.auth.signOut();
+};
 $('refreshBtn').onclick=()=>{loadAppointments();loadBlocks()};
 $('dateFilter').oninput=loadAppointments;$('viewFilter').onchange=loadAppointments;$('barberFilter').onchange=render;$('searchFilter').oninput=render;
 $('clearBtn').onclick=()=>{$('dateFilter').value='';$('barberFilter').value='';$('searchFilter').value='';$('viewFilter').value='upcoming';loadAppointments()};
@@ -220,8 +343,22 @@ $('addBlockBtn').onclick=async()=>{
 };
 
 _supabase.auth.onAuthStateChange(async (_event,session)=>{
-  if(session){$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');try{await loadBarbers();await loadAppointments();await loadBlocks()}catch(e){msg($('appMessage'),e.message)}}
-  else{$('appView').classList.add('hidden');$('loginView').classList.remove('hidden')}
+  if(session){
+    $('loginView').classList.add('hidden');
+    $('appView').classList.remove('hidden');
+    previousAppointmentIds=null;
+    try{
+      await loadBarbers();
+      await loadAppointments();
+      await loadBlocks();
+      startAppointmentPolling();
+    }catch(e){msg($('appMessage'),e.message)}
+  } else {
+    stopAppointmentPolling();
+    previousAppointmentIds=null;
+    $('appView').classList.add('hidden');
+    $('loginView').classList.remove('hidden');
+  }
 });
 </script>
 </body>
