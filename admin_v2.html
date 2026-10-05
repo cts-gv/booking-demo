@@ -115,6 +115,7 @@ let previousAppointmentIds = null;
 let soundEnabled = localStorage.getItem('adminAppointmentSound') !== 'off';
 let audioContext = null;
 let pollingTimer = null;
+let pollCount = 0;
 let highlightedAppointmentIds = new Set();
 
 const $ = id => document.getElementById(id);
@@ -201,6 +202,7 @@ function detectNewAppointments(appointments){
   }
 
   const newIds = [...currentIds].filter(id => !previousAppointmentIds.has(id));
+  console.log('[appt-check]', new Date().toLocaleTimeString(), 'known:', previousAppointmentIds.size, 'now:', currentIds.size, 'new:', newIds.length, 'audio:', audioContext ? audioContext.state : 'none', 'soundEnabled:', soundEnabled);
   previousAppointmentIds = currentIds;
 
   if(!newIds.length) return;
@@ -257,9 +259,12 @@ async function loadAppointments({fromPoll=false}={}){
     renderStats(data.stats);
     render();
     if(data.truncated) msg($('appMessage'),'Showing the first '+allAppointments.length+' results. Use the Show menu or date filter to narrow the list.');
-    $('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
+    pollCount++;
+    $('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString()+' · '+appointments.length+' appts · audio: '+(audioContext?audioContext.state:'not unlocked yet')+' · checks: '+pollCount;
   }catch(e){
+    console.error('[appt-check] load failed', e);
     if(!fromPoll) msg($('appMessage'),e.message);
+    else $('lastUpdated').textContent='Last check FAILED at '+new Date().toLocaleTimeString()+': '+e.message;
   }
 }
 
