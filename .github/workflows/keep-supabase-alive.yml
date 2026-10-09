@@ -1,0 +1,17 @@
+name: Keep Supabase alive
+
+on:
+  schedule:
+    - cron: "0 14 */3 * *"   # every 3 days at 14:00 UTC
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Supabase
+        run: |
+          curl --fail --silent --show-error \
+            "https://ghnkxpsddhmluyoaqtsx.supabase.co/rest/v1/barbers?select=id&limit=1" \
+            -H "apikey: sb_publishable_zUuj6Jd_CYfjbg2nt_K-VA_mNRGYoVL" \
+            -H "Authorization: Bearer sb_publishable_zUuj6Jd_CYfjbg2nt_K-VA_mNRGYoVL"
