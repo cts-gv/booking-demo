@@ -633,7 +633,9 @@ a:hover{color:var(--gold)}
                         <strong style="font-size:20px;letter-spacing:.08em;">
                             ${escapeHtml(appointment.cancellation_code)}
                         </strong><br><br>
-                        <span>Your confirmation will be emailed to ${escapeHtml(email)} once email delivery is enabled.</span>
+                        <span>${data.email_sent
+                            ? `A confirmation email was sent to ${escapeHtml(email)}.`
+                            : `We couldn't send a confirmation email to ${escapeHtml(email)}, so please save your cancellation code above.`}</span>
                     </div>
                 </div>
             `;
