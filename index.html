@@ -782,6 +782,23 @@ a:hover{color:var(--gold)}
             return;
         }
 
+        // Permission already granted on this device: link this appointment automatically
+        if (Notification.permission === 'granted') {
+            box.innerHTML = `<div class="reminder-note">${baseNote} Setting up your notification...</div>`;
+            enablePushReminder(ctx)
+                .then(() => {
+                    box.innerHTML = `<div class="reminder-note ok">✓ Notifications are on. We'll notify you 2 hours before your appointment.</div>`;
+                })
+                .catch(err => {
+                    console.error('Auto push opt-in error:', err);
+                    showReminderButton();
+                });
+            return;
+        }
+
+        showReminderButton();
+
+        function showReminderButton() {
         box.innerHTML = `
             <div class="reminder-note">${baseNote} We'll email you, or send a notification if you turn them on.</div>
             <button type="button" class="reminder-btn">🔔 Turn on notifications</button>
@@ -799,6 +816,7 @@ a:hover{color:var(--gold)}
                 box.innerHTML = `<div class="reminder-note">${escapeHtml(err.message || 'Could not turn on notifications.')}</div>`;
             }
         });
+        }
     }
 
     dateInput.min = getLocalDateString();
