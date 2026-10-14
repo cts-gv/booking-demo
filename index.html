@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b0d0f">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Book">
 <title>Book an Appointment</title>
 <style>
     :root{
@@ -137,6 +145,16 @@
         color:var(--cream);font-size:14px;line-height:1.7;
     }
     .appointment-result-details span{color:var(--muted)}
+    .reminder-box{margin-top:16px;padding-top:14px;border-top:1px solid rgba(214,168,90,.18)}
+    .reminder-note{color:var(--muted);font-size:13px;line-height:1.55;margin-top:6px}
+    .reminder-note.ok{color:var(--gold-bright)}
+    .reminder-btn{
+        width:100%;margin-top:12px;padding:12px 16px;border:1px solid rgba(214,168,90,.55);
+        border-radius:12px;background:rgba(214,168,90,.1);color:var(--gold-bright);
+        font-weight:800;letter-spacing:.04em;cursor:pointer;transition:background .2s,transform .2s;
+    }
+    .reminder-btn:hover{background:rgba(214,168,90,.18);transform:translateY(-1px)}
+    .reminder-btn:disabled{opacity:.6;cursor:default;transform:none}
     .cancel-appointment-btn{
         width:100%;margin-top:14px;padding:12px 16px;border:1px solid rgba(228,119,119,.5);
         border-radius:12px;background:rgba(228,119,119,.08);color:var(--danger);
@@ -640,6 +658,12 @@ a:hover{color:var(--gold)}
                 </div>
             `;
 
+            renderReminderOptIn({
+                email,
+                date,
+                code: appointment.cancellation_code
+            });
+
             bookingForm.reset();
             dateInput.disabled = true;
             serviceSelect.disabled = false;
@@ -659,9 +683,117 @@ a:hover{color:var(--gold)}
         }
     });
 
+    // ---------------------------------------------------------------
+    // REMINDER NOTIFICATIONS (Web Push, with email fallback server-side)
+    // Paste the PUBLIC VAPID key here (the private key stays in Supabase secrets).
+    // ---------------------------------------------------------------
+    const VAPID_PUBLIC_KEY = 'BGyWt3jLMePV8OVIMUNPNGu57ytFUFPowWq55aRNlit1r__3iyFVD-ScpoZUVeIW-xx23MMWEGIflwErewt1Tw0';
+
+    function urlBase64ToUint8Array(base64) {
+        const padding = '='.repeat((4 - base64.length % 4) % 4);
+        const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'));
+        return Uint8Array.from(raw, c => c.charCodeAt(0));
+    }
+
+    function isIOS() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    function isStandalone() {
+        return window.matchMedia('(display-mode: standalone)').matches ||
+            navigator.standalone === true;
+    }
+
+    function pushSupported() {
+        return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    }
+
+    async function enablePushReminder(ctx) {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            throw new Error("Notifications weren't allowed, so we'll email your reminder instead.");
+        }
+
+        const reg = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Notifications are not ready yet. Please reload and try again.')), 6000))
+        ]);
+
+        const subscription = (await reg.pushManager.getSubscription()) ||
+            (await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            }));
+
+        const { error } = await _supabase.functions.invoke('save-push-subscription', {
+            body: {
+                email: ctx.email,
+                date: ctx.date,
+                cancellation_code: ctx.code,
+                subscription: subscription.toJSON()
+            }
+        });
+        if (error) throw error;
+    }
+
+    function renderReminderOptIn(ctx) {
+        const host = bookingResult.querySelector('.appointment-result');
+        if (!host) return;
+
+        const box = document.createElement('div');
+        box.className = 'reminder-box';
+        host.appendChild(box);
+
+        const baseNote = "We'll remind you 2 hours before your appointment.";
+
+        if (VAPID_PUBLIC_KEY.startsWith('PASTE')) {
+            box.innerHTML = `<div class="reminder-note">${baseNote} Check your email.</div>`;
+            return;
+        }
+
+        if (!pushSupported()) {
+            const iosHint = isIOS() && !isStandalone()
+                ? ' Want a notification instead? Tap Share, choose Add to Home Screen, then open the app from your home screen.'
+                : '';
+            box.innerHTML = `<div class="reminder-note">${baseNote} Check your email.${iosHint}</div>`;
+            return;
+        }
+
+        if (Notification.permission === 'denied') {
+            box.innerHTML = `<div class="reminder-note">${baseNote} Notifications are blocked in your browser settings, so we'll email you.</div>`;
+            return;
+        }
+
+        box.innerHTML = `
+            <div class="reminder-note">${baseNote} We'll email you, or send a notification if you turn them on.</div>
+            <button type="button" class="reminder-btn">🔔 Turn on notifications</button>
+        `;
+
+        const btn = box.querySelector('.reminder-btn');
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.textContent = 'Turning on...';
+            try {
+                await enablePushReminder(ctx);
+                box.innerHTML = `<div class="reminder-note ok">✓ Notifications are on. We'll notify you 2 hours before your appointment.</div>`;
+            } catch (err) {
+                console.error('Push opt-in error:', err);
+                box.innerHTML = `<div class="reminder-note">${escapeHtml(err.message || 'Could not turn on notifications.')}</div>`;
+            }
+        });
+    }
+
     dateInput.min = getLocalDateString();
     loadBarbers();
     loadServices();
+</script>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+        });
+    }
 </script>
 </body>
 </html>
